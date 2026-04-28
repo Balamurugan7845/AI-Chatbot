@@ -11,22 +11,27 @@ export default function AuthPage({ setToken }) {
   const initialMode = searchParams.get("mode") || "login";
   const [mode, setMode] = useState(initialMode);
 
-  // Sync mode → URL
+  // Sync mode with URL (safe)
   useEffect(() => {
-    setSearchParams({ mode });
-  }, [mode]);
+    const currentMode = searchParams.get("mode");
+    if (currentMode !== mode) {
+      setSearchParams({ mode });
+    }
+  }, [mode, searchParams, setSearchParams]);
 
   // Redirect if already logged in
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) navigate("/chat");
-  }, []);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f172a] via-[#020617] to-[#020617]">
 
-      {/* Glow Background */}
-      <div className="absolute w-[400px] h-[400px] bg-blue-500/10 blur-3xl rounded-full"></div>
+      {/* Glow */}
+      <div className="absolute inset-0 flex items-center justify-center -z-10">
+        <div className="w-[500px] h-[500px] bg-blue-500/20 blur-[120px] rounded-full"></div>
+      </div>
 
       {/* Card */}
       <motion.div
@@ -34,33 +39,30 @@ export default function AuthPage({ setToken }) {
         animate={{ opacity: 1, scale: 1 }}
         className="relative w-[380px] p-8 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.6)]"
       >
-
-        {/* 🔥 CLEAN TAB TOGGLE (no background) */}
+        {/* Tabs */}
         <div className="flex mb-6 border-b border-white/10">
           <button
             onClick={() => setMode("login")}
-            className={`flex-1 py-2 text-sm font-medium transition ${
-              mode === "login"
+            className={`flex-1 py-2 text-sm font-medium transition ${mode === "login"
                 ? "text-blue-400 border-b-2 border-blue-500"
                 : "text-gray-500 hover:text-gray-300"
-            }`}
+              }`}
           >
             Login
           </button>
 
           <button
             onClick={() => setMode("register")}
-            className={`flex-1 py-2 text-sm font-medium transition ${
-              mode === "register"
+            className={`flex-1 py-2 text-sm font-medium transition ${mode === "register"
                 ? "text-green-400 border-b-2 border-green-500"
                 : "text-gray-500 hover:text-gray-300"
-            }`}
+              }`}
           >
             Register
           </button>
         </div>
 
-        {/* 🔄 Animated Forms */}
+        {/* Forms */}
         <AnimatePresence mode="wait">
           {mode === "login" ? (
             <motion.div
@@ -68,7 +70,6 @@ export default function AuthPage({ setToken }) {
               initial={{ opacity: 0, x: -30 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 30 }}
-              transition={{ duration: 0.25 }}
             >
               <Login
                 setToken={setToken}
@@ -81,13 +82,11 @@ export default function AuthPage({ setToken }) {
               initial={{ opacity: 0, x: 30 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -30 }}
-              transition={{ duration: 0.25 }}
             >
               <Register switchToLogin={() => setMode("login")} />
             </motion.div>
           )}
         </AnimatePresence>
-
       </motion.div>
     </div>
   );
