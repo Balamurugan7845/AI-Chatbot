@@ -7,6 +7,7 @@ export default function Login({ setToken, switchToRegister }) {
   const [data, setData] = useState({ username: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const navigate = useNavigate();
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -26,9 +27,9 @@ export default function Login({ setToken, switchToRegister }) {
       localStorage.setItem("token", res.data.token);
       setToken(res.data.token);
 
-      navigate("/chat"); // ✅ correct place
+      navigate("/chat");
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed");
+      setError(err.response?.data?.message || "Invalid credentials");
     } finally {
       setLoading(false);
     }
@@ -36,16 +37,24 @@ export default function Login({ setToken, switchToRegister }) {
 
   return (
     <div>
-      <h2 className="text-2xl font-semibold text-white text-center mb-6">
+      {/* Title */}
+      <h2 className="text-3xl font-semibold text-white text-center mb-2">
         Welcome Back
       </h2>
 
+      <p className="text-gray-400 text-sm text-center mb-6">
+        Login to continue
+      </p>
+
+      {/* Error */}
       {error && (
-        <p className="text-red-400 text-sm text-center mb-4">{error}</p>
+        <div className="mb-4 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
+          <p className="text-red-400 text-xs text-center">{error}</p>
+        </div>
       )}
 
       {/* Username */}
-      <div className="relative mb-5">
+      <div className="relative mb-6">
         <input
           type="text"
           value={data.username}
@@ -53,12 +62,14 @@ export default function Login({ setToken, switchToRegister }) {
             setData({ ...data, username: e.target.value })
           }
           placeholder=" "
-          className="peer w-full p-3 rounded-lg bg-transparent border border-gray-600 text-white focus:outline-none focus:border-blue-500"
+          className="peer w-full px-4 pt-5 pb-2 rounded-xl bg-white/5 border border-white/10 text-white
+          focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 transition"
         />
+
         <label className="absolute left-4 top-2 text-xs text-gray-400 transition-all
-        peer-placeholder-shown:top-4 peer-placeholder-shown:text-sm
-        peer-placeholder-shown:text-gray-500
-        peer-focus:top-2 peer-focus:text-xs peer-focus:text-blue-400">
+          peer-placeholder-shown:top-4 peer-placeholder-shown:text-sm
+          peer-placeholder-shown:text-gray-500
+          peer-focus:top-2 peer-focus:text-xs peer-focus:text-blue-400">
           Username
         </label>
       </div>
@@ -66,33 +77,50 @@ export default function Login({ setToken, switchToRegister }) {
       {/* Password */}
       <div className="relative mb-6">
         <input
-          type="password"
+          type={showPassword ? "text" : "password"}
           value={data.password}
           onChange={(e) =>
             setData({ ...data, password: e.target.value })
           }
           placeholder=" "
-          className="peer w-full p-3 rounded-lg bg-transparent border border-gray-600 text-white focus:outline-none focus:border-blue-500"
+          className="peer w-full px-4 pt-5 pb-2 pr-12 rounded-xl bg-white/5 border border-white/10 text-white
+          focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 transition"
         />
+
         <label className="absolute left-4 top-2 text-xs text-gray-400 transition-all
-        peer-placeholder-shown:top-4 peer-placeholder-shown:text-sm
-        peer-placeholder-shown:text-gray-500
-        peer-focus:top-2 peer-focus:text-xs peer-focus:text-blue-400">
+          peer-placeholder-shown:top-4 peer-placeholder-shown:text-sm
+          peer-placeholder-shown:text-gray-500
+          peer-focus:top-2 peer-focus:text-xs peer-focus:text-blue-400">
           Password
         </label>
+
+        {/* Show/Hide Password */}
+        <button
+          type="button"
+          onClick={() => setShowPassword(!showPassword)}
+          className="absolute right-3 top-3 text-gray-400 hover:text-white text-sm"
+        >
+          {showPassword ? "Hide" : "Show"}
+        </button>
       </div>
 
+      {/* Button */}
       <motion.button
-        whileTap={{ scale: 0.95 }}
-        whileHover={{ scale: 1.03 }}
+        whileTap={{ scale: 0.96 }}
+        whileHover={{ scale: 1.02 }}
         onClick={handleLogin}
         disabled={loading}
-        className="w-full py-3 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-600 text-white"
+        className="w-full py-3 rounded-xl font-semibold tracking-wide
+        bg-gradient-to-r from-blue-500 to-indigo-600
+        hover:from-blue-600 hover:to-indigo-700
+        shadow-lg shadow-blue-500/20
+        transition-all duration-300 disabled:opacity-60"
       >
         {loading ? "Logging in..." : "Login"}
       </motion.button>
 
-      <p className="text-gray-400 text-sm text-center mt-5">
+      {/* Footer */}
+      <p className="text-gray-400 text-sm text-center mt-6">
         Don’t have an account?{" "}
         <span
           onClick={switchToRegister}
