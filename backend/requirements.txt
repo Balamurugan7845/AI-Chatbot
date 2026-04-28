@@ -1,7 +1,9 @@
 fastapi
 uvicorn
 pymongo
+dnspython
 python-dotenv
 passlib[bcrypt]
-python-jose
+PyJWT
 google-genai
+certifi

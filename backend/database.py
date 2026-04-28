@@ -1,67 +1,54 @@
-# ---------------- IMPORTS ---------------- #
-
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
+from pymongo.server_api import ServerApi
 import os
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
-# ---------------- CONFIG ---------------- #
-
-MONGO_URI = os.getenv("MONGO_URI")
+MONGO_URI = os.getenv("MONGO_URI_link")
 DB_NAME = os.getenv("DB_NAME", "chatbot")
 
 if not MONGO_URI:
     raise ValueError("❌ MONGO_URI missing in .env")
 
-# ---------------- CONNECTION ---------------- #
-
 try:
     client = MongoClient(
         MONGO_URI,
+        server_api=ServerApi('1'),
         serverSelectionTimeoutMS=5000,
         connectTimeoutMS=5000,
-        maxPoolSize=50,      # ✅ connection pooling
+        maxPoolSize=50,
         retryWrites=True
     )
 
-    client.admin.command("ping")  # ✅ verify connection
+    client.admin.command("ping")
     print("✅ MongoDB connected")
 
 except ConnectionFailure as e:
     print("❌ MongoDB connection failed:", str(e))
     raise
 
-# ---------------- DATABASE ---------------- #
-
 db = client[DB_NAME]
 
 users = db["users"]
 chats = db["chats"]
-
-# ✅ NEW: for logout token blacklist
 blacklist = db["blacklist"]
-
-# ---------------- INDEXES ---------------- #
+sessions = db["sessions"] 
 
 def create_indexes():
     try:
-        # Users
-        users.create_index("username", unique=True)
+        users.create_index([("username", 1)], unique=True)
+        chats.create_index([("user", 1)])
+        chats.create_index([("created_at", -1)])
 
-        # Chats
-        chats.create_index("user")
-        chats.create_index("created_at")
-
-        # Blacklist
-        blacklist.create_index("token", unique=True)
-
-        # 🔥 TTL index → auto delete tokens after expiry window
+        blacklist.create_index([("token", 1)], unique=True)
         blacklist.create_index(
-            "created_at",
-            expireAfterSeconds=86400  # 24 hours
+            [("created_at", 1)],
+            expireAfterSeconds=86400
         )
+        sessions.create_index("username", unique=True)
 
         print("✅ Indexes ensured")
 

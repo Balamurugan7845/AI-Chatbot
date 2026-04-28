@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from database import users, chats, blacklist
+from database import users, chats, blacklist, sessions
 from schemas import ChatRequest
 from models import UserModel
 
@@ -23,8 +23,6 @@ from auth import hash_password, verify_password, create_token, decode_token
 load_dotenv()
 
 app = FastAPI()
-
-# 🔥 FIX: disable auto 401
 security = HTTPBearer(auto_error=False)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -46,7 +44,6 @@ app.add_middleware(
 
 # ---------------- AUTH ---------------- #
 
-
 @app.post("/register", status_code=status.HTTP_201_CREATED)
 def register(user: UserModel):
     try:
@@ -58,24 +55,18 @@ def register(user: UserModel):
         if len(user.password) < 6:
             raise HTTPException(400, "Password must be at least 6 characters")
 
-        users.insert_one(
-            {
-                "username": username,
-                "password": hash_password(user.password),
-                "created_at": datetime.utcnow(),
-            }
-        )
+        users.insert_one({
+            "username": username,
+            "password": hash_password(user.password),
+            "created_at": datetime.utcnow(),
+        })
 
         return {"message": "User created successfully"}
 
     except DuplicateKeyError:
         raise HTTPException(400, "User already exists")
 
-    except Exception as e:
-        print("❌ REGISTER ERROR:", str(e))
-        raise HTTPException(500, "Internal server error")
-
-
+# 🔥 FIXED LOGIN (single session)
 @app.post("/login")
 def login(user: UserModel):
     username = user.username.strip().lower()
@@ -84,10 +75,27 @@ def login(user: UserModel):
     if not db_user or not verify_password(user.password, db_user["password"]):
         raise HTTPException(401, "Invalid credentials")
 
+    # 🔥 invalidate old session
+    existing = sessions.find_one({"username": username})
+
+    if existing:
+        blacklist.insert_one({
+            "token": existing["token"],
+            "created_at": datetime.utcnow()
+        })
+        sessions.delete_one({"username": username})
+
     token = create_token({"username": username})
+
+    sessions.insert_one({
+        "username": username,
+        "token": token,
+        "created_at": datetime.utcnow()
+    })
+
     return {"token": token}
 
-
+# 🔥 FIXED LOGOUT
 @app.post("/logout")
 def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials:
@@ -95,36 +103,45 @@ def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
     token = credentials.credentials
 
-    # store token in blacklist
-    blacklist.insert_one({"token": token, "created_at": datetime.utcnow()})
+    blacklist.insert_one({
+        "token": token,
+        "created_at": datetime.utcnow()
+    })
+
+    sessions.delete_one({"token": token})
 
     return {"message": "Logged out successfully"}
 
-
 # ---------------- AUTH MIDDLEWARE ---------------- #
 
-
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    print("🔍 Credentials:", credentials)
-
     if not credentials:
         raise HTTPException(401, "Missing Authorization header")
 
     token = credentials.credentials
-    print("🔑 Token:", token)
+
+    # 🔴 Check blacklist
+    if blacklist.find_one({"token": token}):
+        raise HTTPException(401, "Token expired. Login again")
 
     payload = decode_token(token)
 
     if not payload:
         raise HTTPException(401, "Invalid or expired token")
 
-    return payload.get("username")
+    username = payload.get("username")
 
+    # 🔴 Check active session
+    session = sessions.find_one({"username": username})
+
+    if not session or session["token"] != token:
+        raise HTTPException(401, "Session expired. Login again")
+
+    return username
 
 # ---------------- RATE LIMIT ---------------- #
 
 user_limits = {}
-
 
 def check_rate_limit(user: str, request: Request):
     max_requests = int(os.getenv("MAX_REQUESTS", 5))
@@ -139,22 +156,21 @@ def check_rate_limit(user: str, request: Request):
 
     user_limits[identifier] += 1
 
+# ---------------- FORMAT DETECTION ---------------- #
 
 def detect_format(message: str):
     msg = (message or "").lower()
 
     if "bullet" in msg or "points" in msg:
         return "bullet"
-
     if "paragraph" in msg:
         return "paragraph"
-
     if "structured" in msg or "format" in msg:
         return "structured"
 
     return "default"
 
-
+# ---------------- CHAT STREAM ---------------- #
 
 @app.post("/chat-stream")
 async def chat_stream(
@@ -162,117 +178,44 @@ async def chat_stream(
 ):
     check_rate_limit(user, request)
 
-    identifier = user or f"anon:{request.client.host if request.client else 'unknown'}"
-
-    # Build a prompt based on requested format
     format_type = detect_format(req.message)
 
     if format_type == "structured":
-        prompt = f"""
-Format the answer EXACTLY like this:
-
-Title
-<short title>
-
-Definition
-<short paragraph>
-
-Key Characteristics
-• point 1
-• point 2
-• point 3
-
-Core Functions
-• point 1
-• point 2
-• point 3
-• point 4
-
-Question: {req.message}
-"""
-
+        prompt = f"Structured format:\n{req.message}"
     elif format_type == "bullet":
-        prompt = f"""
-Answer in bullet points only:
-
-• point 1
-• point 2
-• point 3
-• point 4
-
-Question: {req.message}
-"""
-
+        prompt = f"Bullet points:\n{req.message}"
     elif format_type == "paragraph":
-        prompt = f"""
-Answer in a clean paragraph only (no bullets, no headings):
-
-Question: {req.message}
-"""
-
+        prompt = f"Paragraph:\n{req.message}"
     else:
         prompt = req.message
 
     try:
-        upstream_stream = client.models.generate_content_stream(
-            model="gemini-2.5-flash", contents=prompt
+        stream = client.models.generate_content_stream(
+            model="gemini-2.5-flash",
+            contents=prompt
         )
     except Exception as e:
-        # rollback rate limit
-        if identifier in user_limits and user_limits[identifier] > 0:
-            user_limits[identifier] -= 1
-
-        err_str = str(e)
-        print("❌ STREAM ERROR (preflight):", err_str)
-
-        import re, math
-
-        m = re.search(r"Please retry in (\d+\.?\d*)s", err_str)
-        retry_after = str(math.ceil(float(m.group(1)))) if m else None
-
-        return JSONResponse(
-            content={"detail": err_str[:200]},
-            status_code=503,
-            headers={"Retry-After": retry_after} if retry_after else {},
-        )
+        return JSONResponse({"error": str(e)}, status_code=500)
 
     async def generate():
-        full_text = ""
+        full = ""
+        for chunk in stream:
+            if await request.is_disconnected():
+                break
+            if hasattr(chunk, "text") and chunk.text:
+                full += chunk.text
+                yield chunk.text
 
-        try:
-            for chunk in upstream_stream:
-                if await request.is_disconnected():
-                    break
+        chats.insert_one({
+            "user": user,
+            "message": req.message,
+            "response": full,
+            "created_at": datetime.utcnow(),
+        })
 
-                if hasattr(chunk, "text") and chunk.text:
-                    full_text += chunk.text
-                    yield chunk.text
-
-            chats.insert_one(
-                {
-                    "user": user,
-                    "message": req.message,
-                    "response": full_text,
-                    "created_at": datetime.utcnow(),
-                }
-            )
-
-        except Exception as e:
-            print("❌ STREAM ERROR:", str(e))
-            yield f"\n[ERROR]: {str(e)}"
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/plain",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        },
-    )
-
+    return StreamingResponse(generate(), media_type="text/plain")
 
 # ---------------- HEALTH ---------------- #
-
 
 @app.get("/")
 def home():

@@ -1,13 +1,13 @@
 # ---------------- IMPORTS ---------------- #
 
 from passlib.context import CryptContext
-from jose import jwt, JWTError, ExpiredSignatureError
+import jwt
 from datetime import datetime, timedelta
 import hashlib
 import os
 from dotenv import load_dotenv
 
-from database import blacklist  # ✅ required for logout
+from database import blacklist
 
 load_dotenv()
 
@@ -27,80 +27,54 @@ if not SECRET:
 def normalize_password(password: str) -> str:
     return password.strip()
 
-
 def hash_password(password: str) -> str:
     password = normalize_password(password)
-
-    sha = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    sha = hashlib.sha256(password.encode()).hexdigest()
     return pwd.hash(sha)
-
 
 def verify_password(password: str, hashed: str) -> bool:
     password = normalize_password(password)
-
-    sha = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    sha = hashlib.sha256(password.encode()).hexdigest()
     return pwd.verify(sha, hashed)
 
 # ---------------- TOKEN ---------------- #
 
 def create_token(data: dict) -> str:
-    now = datetime.utcnow()
-
     payload = {
         **data,
-        "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(hours=EXPIRE_HOURS)).timestamp())
+        "exp": datetime.utcnow() + timedelta(hours=EXPIRE_HOURS)
     }
-
-    token = jwt.encode(payload, SECRET, algorithm=ALGORITHM)
-    return token
-
+    return jwt.encode(payload, SECRET, algorithm=ALGORITHM)
 
 def decode_token(token: str):
     try:
-        # 🚫 BLACKLIST CHECK (logout support)
+        # 🚫 BLACKLIST CHECK
         if blacklist.find_one({"token": token}):
             print("🚫 Token is blacklisted")
             return None
 
-        # `python-jose` does not accept a `leeway` kwarg on decode in some versions.
-        # Use standard decode with verified expiration. Token timestamps are numeric.
-        payload = jwt.decode(
-            token,
-            SECRET,
-            algorithms=[ALGORITHM],
-            options={"verify_exp": True},
-        )
+        payload = jwt.decode(token, SECRET, algorithms=[ALGORITHM])
 
-        print("📦 DECODED PAYLOAD:", payload)
-
-        # strict validation
         if not payload or "username" not in payload:
-            print("❌ Invalid payload structure")
             return None
 
         return payload
 
-    except ExpiredSignatureError:
-        print("❌ JWT ERROR: Token expired")
+    except jwt.ExpiredSignatureError:
+        print("❌ Token expired")
         return None
 
-    except JWTError as e:
-        print("❌ JWT ERROR:", str(e))
+    except jwt.InvalidTokenError:
+        print("❌ Invalid token")
         return None
 
-# ---------------- LOGOUT (BLACKLIST) ---------------- #
+# ---------------- LOGOUT ---------------- #
 
 def blacklist_token(token: str):
-    """
-    Store token in blacklist so it can't be used again.
-    """
     try:
         blacklist.insert_one({
             "token": token,
             "created_at": datetime.utcnow()
         })
-        print("✅ Token blacklisted")
-
     except Exception as e:
         print("❌ Blacklist error:", str(e))
