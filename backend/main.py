@@ -34,9 +34,15 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 
 # ---------------- CORS ---------------- #
 
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://ai-chatbot-iota-mocha.vercel.app",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,58 +50,64 @@ app.add_middleware(
 
 # ---------------- AUTH ---------------- #
 
+
 @app.post("/register", status_code=status.HTTP_201_CREATED)
 def register(user: UserModel):
     try:
-        username = user.username.strip().lower()
+        email = user.email.strip().lower()
 
-        if not username:
-            raise HTTPException(400, "Username cannot be empty")
+        if not email:
+            raise HTTPException(400, "Email cannot be empty")
 
         if len(user.password) < 6:
             raise HTTPException(400, "Password must be at least 6 characters")
 
-        users.insert_one({
-            "username": username,
-            "password": hash_password(user.password),
-            "created_at": datetime.utcnow(),
-        })
+        users.insert_one(
+            {
+                "email": email,
+                "password": hash_password(user.password),
+                "created_at": datetime.utcnow(),
+            }
+        )
 
         return {"message": "User created successfully"}
 
     except DuplicateKeyError:
         raise HTTPException(400, "User already exists")
 
-# 🔥 FIXED LOGIN (single session)
+
 @app.post("/login")
 def login(user: UserModel):
-    username = user.username.strip().lower()
-    db_user = users.find_one({"username": username})
+    try:
+        email = user.email.strip().lower()
 
-    if not db_user or not verify_password(user.password, db_user["password"]):
-        raise HTTPException(401, "Invalid credentials")
+        db_user = users.find_one({"email": email})
 
-    # 🔥 invalidate old session
-    existing = sessions.find_one({"username": username})
+        if not db_user or not verify_password(user.password, db_user["password"]):
+            raise HTTPException(401, "Invalid credentials")
 
-    if existing:
-        blacklist.insert_one({
-            "token": existing["token"],
-            "created_at": datetime.utcnow()
-        })
-        sessions.delete_one({"username": username})
+        existing = sessions.find_one({"email": email})
 
-    token = create_token({"username": username})
+        if existing:
+            blacklist.insert_one(
+                {"token": existing["token"], "created_at": datetime.utcnow()}
+            )
+            sessions.delete_one({"email": email})
 
-    sessions.insert_one({
-        "username": username,
-        "token": token,
-        "created_at": datetime.utcnow()
-    })
+        token = create_token({"email": email})
 
-    return {"token": token}
+        sessions.insert_one(
+            {"email": email, "token": token, "created_at": datetime.utcnow()}
+        )
 
-# 🔥 FIXED LOGOUT
+        return {"token": token}
+
+    except Exception as e:
+        print("LOGIN ERROR:", e)
+        raise HTTPException(500, str(e))
+
+
+
 @app.post("/logout")
 def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials:
@@ -103,16 +115,15 @@ def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
     token = credentials.credentials
 
-    blacklist.insert_one({
-        "token": token,
-        "created_at": datetime.utcnow()
-    })
+    blacklist.insert_one({"token": token, "created_at": datetime.utcnow()})
 
     sessions.delete_one({"token": token})
 
     return {"message": "Logged out successfully"}
 
+
 # ---------------- AUTH MIDDLEWARE ---------------- #
+
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials:
@@ -120,7 +131,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
 
     token = credentials.credentials
 
-    # 🔴 Check blacklist
+    # Check blacklist
     if blacklist.find_one({"token": token}):
         raise HTTPException(401, "Token expired. Login again")
 
@@ -129,19 +140,20 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     if not payload:
         raise HTTPException(401, "Invalid or expired token")
 
-    username = payload.get("username")
+    email = payload.get("email")
 
-    # 🔴 Check active session
-    session = sessions.find_one({"username": username})
+    session = sessions.find_one({"email": email})
 
     if not session or session["token"] != token:
         raise HTTPException(401, "Session expired. Login again")
 
-    return username
+    return email
+
 
 # ---------------- RATE LIMIT ---------------- #
 
 user_limits = {}
+
 
 def check_rate_limit(user: str, request: Request):
     max_requests = int(os.getenv("MAX_REQUESTS", 5))
@@ -156,7 +168,9 @@ def check_rate_limit(user: str, request: Request):
 
     user_limits[identifier] += 1
 
+
 # ---------------- FORMAT DETECTION ---------------- #
+
 
 def detect_format(message: str):
     msg = (message or "").lower()
@@ -170,7 +184,9 @@ def detect_format(message: str):
 
     return "default"
 
+
 # ---------------- CHAT STREAM ---------------- #
+
 
 @app.post("/chat-stream")
 async def chat_stream(
@@ -191,8 +207,7 @@ async def chat_stream(
 
     try:
         stream = client.models.generate_content_stream(
-            model="gemini-2.5-flash",
-            contents=prompt
+            model="gemini-2.5-flash", contents=prompt
         )
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
@@ -206,16 +221,20 @@ async def chat_stream(
                 full += chunk.text
                 yield chunk.text
 
-        chats.insert_one({
-            "user": user,
-            "message": req.message,
-            "response": full,
-            "created_at": datetime.utcnow(),
-        })
+        chats.insert_one(
+            {
+                "user": user,
+                "message": req.message,
+                "response": full,
+                "created_at": datetime.utcnow(),
+            }
+        )
 
     return StreamingResponse(generate(), media_type="text/plain")
 
+
 # ---------------- HEALTH ---------------- #
+
 
 @app.get("/")
 def home():

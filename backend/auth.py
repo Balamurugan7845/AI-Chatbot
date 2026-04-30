@@ -48,7 +48,7 @@ def create_token(data: dict) -> str:
 
 def decode_token(token: str):
     try:
-        # 🚫 BLACKLIST CHECK
+        # BLACKLIST CHECK
         if blacklist.find_one({"token": token}):
             print("🚫 Token is blacklisted")
             return None

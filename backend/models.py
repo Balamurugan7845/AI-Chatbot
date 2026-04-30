@@ -22,7 +22,7 @@ class UserInDB(BaseModel):
 # ---------------- CHAT MODEL ---------------- #
 
 class ChatMessage(BaseModel):
-    role: Literal["user", "bot"]   # ✅ restricted values
+    role: Literal["user", "bot"]  
     text: constr(min_length=1)
 
 

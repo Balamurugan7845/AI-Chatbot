@@ -3,11 +3,10 @@ from pymongo.errors import ConnectionFailure
 from pymongo.server_api import ServerApi
 import os
 from dotenv import load_dotenv
-from datetime import datetime
 
 load_dotenv()
 
-MONGO_URI = os.getenv("MONGO_URI_link")
+MONGO_URI = os.getenv("MONGO_URI_LINK")
 DB_NAME = os.getenv("DB_NAME", "chatbot")
 
 if not MONGO_URI:
@@ -16,11 +15,12 @@ if not MONGO_URI:
 try:
     client = MongoClient(
         MONGO_URI,
-        server_api=ServerApi('1'),
-        serverSelectionTimeoutMS=5000,
-        connectTimeoutMS=5000,
+        server_api=ServerApi("1"),
+        serverSelectionTimeoutMS=10000,
+        connectTimeoutMS=10000,
         maxPoolSize=50,
-        retryWrites=True
+        retryWrites=True,
+        tls=True
     )
 
     client.admin.command("ping")
@@ -35,24 +35,18 @@ db = client[DB_NAME]
 users = db["users"]
 chats = db["chats"]
 blacklist = db["blacklist"]
-sessions = db["sessions"] 
+sessions = db["sessions"]
 
 def create_indexes():
-    try:
-        users.create_index([("username", 1)], unique=True)
-        chats.create_index([("user", 1)])
-        chats.create_index([("created_at", -1)])
+    users.create_index([("email", 1)], unique=True)
+    chats.create_index([("user", 1)])
+    chats.create_index([("created_at", -1)])
 
-        blacklist.create_index([("token", 1)], unique=True)
-        blacklist.create_index(
-            [("created_at", 1)],
-            expireAfterSeconds=86400
-        )
-        sessions.create_index("username", unique=True)
+    blacklist.create_index([("token", 1)], unique=True)
+    blacklist.create_index([("created_at", 1)], expireAfterSeconds=86400)
 
-        print("✅ Indexes ensured")
+    sessions.create_index("email", unique=True)
 
-    except Exception as e:
-        print("⚠️ Index creation warning:", str(e))
+    print("✅ Indexes ensured")
 
 create_indexes()
