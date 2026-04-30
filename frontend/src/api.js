@@ -9,7 +9,7 @@ export const streamMessage = async (
     onStart?.();
 
     const response = await fetch(
-      `${import.meta.env.VITE_API_URL}/chat-stream`,
+      `${import.meta.env.VITE_API_URL_LINK}/chat-stream`,
       {
         method: "POST",
         headers: {

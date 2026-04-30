@@ -1,17 +1,17 @@
-from pydantic import BaseModel, Field, constr
+from pydantic import BaseModel, Field, EmailStr, constr
 from typing import Optional, Literal
 from datetime import datetime
 
 # ---------------- USER MODEL ---------------- #
 
 class UserModel(BaseModel):
-    username: constr(min_length=3, max_length=30, strip_whitespace=True)
+    email: EmailStr
     password: constr(min_length=6, max_length=128)
 
 
 class UserInDB(BaseModel):
     id: Optional[str] = Field(default=None, alias="_id")
-    username: str
+    email: EmailStr
     password: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -22,12 +22,12 @@ class UserInDB(BaseModel):
 # ---------------- CHAT MODEL ---------------- #
 
 class ChatMessage(BaseModel):
-    role: Literal["user", "bot"]  
+    role: Literal["user", "bot"]
     text: constr(min_length=1)
 
 
 class ChatModel(BaseModel):
-    user: str
+    user: str   # this will store email
     message: constr(min_length=1)
     response: constr(min_length=1)
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -51,3 +51,4 @@ class MessageResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     error: str
+
