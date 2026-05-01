@@ -10,7 +10,7 @@ from app.db.database import blacklist
 
 # ---------------- LOAD ENV ---------------- #
 
-load_dotenv()  # ✅ simpler & deployment-safe
+load_dotenv()  
 
 # ---------------- CONFIG ---------------- #
 
