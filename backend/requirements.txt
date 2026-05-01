@@ -1,9 +1,13 @@
 fastapi
 uvicorn[standard]
+
 pymongo
 python-dotenv
+
 passlib[bcrypt]
-pyjwt
-pydantic
+bcrypt==4.0.1
+python-jose
+
+google-generativeai
+
 email-validator
-bson
