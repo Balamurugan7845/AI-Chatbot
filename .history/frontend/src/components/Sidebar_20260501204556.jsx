@@ -2,7 +2,8 @@ import { MessageSquarePlus, LogOut, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../api/index.js";
+import api from "../api/index.js"; // ✅ USE API INSTANCE
+
 const STORAGE_KEY = "chat_sessions";
 
 export default function Sidebar({ setCurrentChat, closeSidebar }) {
