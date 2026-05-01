@@ -26,53 +26,32 @@ A modern AI chatbot built with:
 ## 📁 Project Structure
 
 ```
-├── 📁 backend
-│   ├── 📁 routes
-│   │   └── 🐍 chat.py
-│   ├── 🐍 auth.py
-│   ├── 🐍 database.py
-│   ├── 🐍 main.py
-│   ├── 🐍 models.py
-│   ├── 📄 requirements.txt
-│   └── 🐍 schemas.py
-├── 📁 frontend
-│   ├── 📁 public
-│   │   ├── 🖼️ favicon.svg
-│   │   └── 🖼️ icons.svg
-│   ├── 📁 src
-│   │   ├── 📁 api
-│   │   │   ├── 📄 config.js
-│   │   │   └── 📄 index.js
-│   │   ├── 📁 assets
-│   │   │   ├── 🖼️ hero.png
-│   │   │   ├── 🖼️ react.svg
-│   │   │   └── 🖼️ vite.svg
-│   │   ├── 📁 components
-│   │   │   ├── 📄 ChatWindow.jsx
-│   │   │   ├── 📄 MessageBubble.jsx
-│   │   │   ├── 📄 ProtectedRoute.jsx
-│   │   │   ├── 📄 Sidebar.jsx
-│   │   │   └── 📄 TypingIndicator.jsx
-│   │   ├── 📁 pages
-│   │   │   ├── 📄 AuthPage.jsx
-│   │   │   ├── 📄 Chat.jsx
-│   │   │   ├── 📄 ChatLayout.jsx
-│   │   │   ├── 📄 Login.jsx
-│   │   │   └── 📄 Register.jsx
-│   │   ├── 📄 App.jsx
-│   │   ├── 📄 api.js
-│   │   ├── 🎨 index.css
-│   │   └── 📄 main.jsx
-│   ├── 📝 README.md
-│   ├── 📄 eslint.config.js
-│   ├── 🌐 index.html
-│   ├── ⚙️ package-lock.json
-│   ├── ⚙️ package.json
-│   ├── 📄 postcss.config.js
-│   └── 📄 vite.config.js
-├── ⚙️ .gitignore
-├── 📝 README.md
-└── 📄 start.bat
+├── backend/
+│   ├── app/
+│   │   ├── core/        # config, security
+│   │   ├── db/          # database connection
+│   │   ├── models/      # schemas/models
+│   │   ├── routes/      # API routes
+│   │   ├── services/    # business logic (AI, etc.)
+│   │   └── main.py      # FastAPI entry point
+│   ├── requirements.txt
+│   └── .env             # (not committed)
+│
+├── frontend/
+│   ├── src/
+│   │   ├── api/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   ├── public/
+│   ├── package.json
+│   └── vite.config.js
+│
+├── .gitignore
+├── README.md
+├── LICENSE
+└── render.yaml
 ```
 
 ---
