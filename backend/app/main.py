@@ -11,7 +11,7 @@ app = FastAPI(title="AI Chatbot API", version="1.0.0")
 origins = [
     "http://localhost:5173",  # React (Vite)
     "http://127.0.0.1:5173",
-    "https://ai-chatbot-git-main-balamurugan7845s-projects.vercel.app",
+    "ai-chatbot-iota-mocha.vercel.app",
 ]
 
 app.add_middleware(

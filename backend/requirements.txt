@@ -1,24 +1,9 @@
 fastapi
-<<<<<<< HEAD
 uvicorn[standard]
-
 pymongo
 python-dotenv
-
 passlib[bcrypt]
 pyjwt
-
 pydantic
 email-validator
-
 bson
-=======
-uvicorn
-pymongo
-dnspython
-python-dotenv
-passlib[bcrypt]
-PyJWT
-google-genai
-certifi
->>>>>>> ec4d3b44b8d2a619573b1df9fcf7138633a7194e
